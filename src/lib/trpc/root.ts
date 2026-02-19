@@ -1,8 +1,10 @@
 import { t } from "@/lib/trpc/trpc";
-import { helloRouter } from "./routes/hello";
+import { eventRouter } from "./routes/event";
+import { packageRouter } from "./routes/package";
 
 export const appRouter = t.router({
-  hello: helloRouter,
+  event: eventRouter,
+  package: packageRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -8,17 +8,35 @@ datasource db {
 }
 
 model User {
-  id            String    @id
+  id            String              @id
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String              @unique
+  emailVerified Boolean             @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
   accounts      Account[]
   sessions      Session[]
+  events        Event[]
+  packages      Package[]
+  purchases     PackagePurchase[]
 
   @@map("user")
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  imageUrl  String?  @map("image_url")
+  content   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  package   Package?
+
+  @@index([userId])
+  @@map("event")
 }
 
 model Session {
@@ -66,4 +84,43 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+model Package {
+  id                   String              @id @default(cuid())
+  shortId              String              @unique @default(cuid())
+  eventId              String              @unique
+  event                Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                 String
+  price                Int
+  currency             String              @default("IDR")
+  googleMeetings       Json?
+  googleDriveFolderId  String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  purchases            PackagePurchase[]
+
+  @@index([userId])
+  @@index([eventId])
+  @@map("package")
+}
+
+model PackagePurchase {
+  id               String    @id @default(cuid())
+  packageId        String
+  package          Package   @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  buyerId          String
+  buyer            User      @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  xenditInvoiceId  String?   @unique
+  status           String    @default("pending")
+  paidAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([packageId])
+  @@index([buyerId])
+  @@index([xenditInvoiceId])
+  @@map("package_purchase")
 }
