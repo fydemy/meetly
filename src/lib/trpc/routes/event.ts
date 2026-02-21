@@ -16,6 +16,29 @@ const BUCKET = "editor-images";
 const MAX_EVENTS_PER_USER = 5;
 const MAX_MEETINGS_PER_EVENT = 3;
 
+/** Parse startDate as ISO or as local date/time in the given timezone; return ISO string for API. */
+function toMeetStartISO(startDate: string, timezone: string): string {
+  const s = startDate.trim();
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(s)) return s;
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return s;
+  const [, y, m, d, h, min, sec] = match;
+  const year = parseInt(y!, 10);
+  const month = parseInt(m!, 10) - 1;
+  const day = parseInt(d!, 10);
+  const hour = parseInt(h!, 10);
+  const minute = parseInt(min!, 10);
+  const second = parseInt(sec || "0", 10);
+  const offsetHours: Record<string, number> = {
+    "Asia/Jakarta": 7,
+    "Asia/Singapore": 8,
+    UTC: 0,
+  };
+  const offset = offsetHours[timezone] ?? 0;
+  const utcDate = new Date(Date.UTC(year, month, day, hour - offset, minute, second));
+  return utcDate.toISOString();
+}
+
 const editorBlockSchema = z.object({
   id: z.string().optional(),
   type: z.string(),
@@ -152,8 +175,9 @@ export const eventRouter = t.router({
           startDate?: string;
           timezone?: string;
           speakerEmail?: string;
+          speakerEmails?: string[];
         }>;
-        driveFolder?: { path?: string; speakerEmail?: string };
+        driveFolder?: { path?: string; speakerEmail?: string; speakerEmails?: string[] };
       };
 
       const packageBlock = contentWithUrls.blocks?.find(
@@ -184,9 +208,10 @@ export const eventRouter = t.router({
           if (meetingsToCreate.length > 0) {
             try {
               for (const meeting of meetingsToCreate) {
+                const startISO = toMeetStartISO(meeting.startDate!, meeting.timezone || "UTC");
                 const meetEvent = await createMeetEvent({
                   userId,
-                  startDate: meeting.startDate!,
+                  startDate: startISO,
                   timezone: meeting.timezone || "UTC",
                   summary: `${pkgData.name} - Session`,
                   durationMinutes: 60,
@@ -199,17 +224,18 @@ export const eventRouter = t.router({
                   timezone: meeting.timezone || "UTC",
                 });
 
-                // Add speaker to meeting if speakerEmail is provided for this meeting
-                if (meeting.speakerEmail?.trim()) {
+                const meetingInviteEmails = meeting.speakerEmails ?? (meeting.speakerEmail?.trim() ? [meeting.speakerEmail.trim()] : []);
+                for (const email of meetingInviteEmails) {
+                  if (!email?.trim()) continue;
                   try {
                     await addAttendeeToMeet({
                       userId,
                       meetingId: meetEvent.meetingId,
-                      attendeeEmail: meeting.speakerEmail.trim(),
+                      attendeeEmail: email.trim(),
                     });
                   } catch (error) {
                     console.error(
-                      `Failed to add speaker to meeting ${meetEvent.meetingId}:`,
+                      `Failed to add attendee to meeting ${meetEvent.meetingId}:`,
                       error,
                     );
                   }
@@ -236,18 +262,19 @@ export const eventRouter = t.router({
               });
               driveFolderId = folder.folderId;
 
-              // Share folder with speaker if speakerEmail is provided for this drive folder
-              if (pkgData.driveFolder?.speakerEmail?.trim()) {
+              const driveInviteEmails = pkgData.driveFolder?.speakerEmails ?? (pkgData.driveFolder?.speakerEmail?.trim() ? [pkgData.driveFolder.speakerEmail.trim()] : []);
+              for (const email of driveInviteEmails) {
+                if (!email?.trim()) continue;
                 try {
                   await shareFolderWithUser({
                     userId,
                     folderId: folder.folderId,
-                    email: pkgData.driveFolder.speakerEmail.trim(),
+                    email: email.trim(),
                     role: "reader",
                   });
                 } catch (error) {
                   console.error(
-                    `Failed to share folder with speaker:`,
+                    `Failed to share folder with invitee:`,
                     error,
                   );
                 }
@@ -370,8 +397,9 @@ export const eventRouter = t.router({
           startDate?: string;
           timezone?: string;
           speakerEmail?: string;
+          speakerEmails?: string[];
         }>;
-        driveFolder?: { path?: string; speakerEmail?: string };
+        driveFolder?: { path?: string; speakerEmail?: string; speakerEmails?: string[] };
       };
 
       const packageBlock = contentWithUrls.blocks?.find(
@@ -412,9 +440,10 @@ export const eventRouter = t.router({
             if (newMeetingsToCreate.length > 0) {
               try {
                 for (const meeting of newMeetingsToCreate) {
+                  const startISO = toMeetStartISO(meeting.startDate!, meeting.timezone || "UTC");
                   const meetEvent = await createMeetEvent({
                     userId,
-                    startDate: meeting.startDate!,
+                    startDate: startISO,
                     timezone: meeting.timezone || "UTC",
                     summary: `${pkgData.name} - Session`,
                     durationMinutes: 60,
@@ -426,17 +455,18 @@ export const eventRouter = t.router({
                     timezone: meeting.timezone || "UTC",
                   });
 
-                  // Add speaker to meeting if speakerEmail is provided for this meeting
-                  if (meeting.speakerEmail?.trim()) {
+                  const newMeetingInviteEmails = meeting.speakerEmails ?? (meeting.speakerEmail?.trim() ? [meeting.speakerEmail.trim()] : []);
+                  for (const email of newMeetingInviteEmails) {
+                    if (!email?.trim()) continue;
                     try {
                       await addAttendeeToMeet({
                         userId,
                         meetingId: meetEvent.meetingId,
-                        attendeeEmail: meeting.speakerEmail.trim(),
+                        attendeeEmail: email.trim(),
                       });
                     } catch (error) {
                       console.error(
-                        `Failed to add speaker to meeting ${meetEvent.meetingId}:`,
+                        `Failed to add attendee to meeting ${meetEvent.meetingId}:`,
                         error,
                       );
                     }
@@ -461,18 +491,19 @@ export const eventRouter = t.router({
                 });
                 driveFolderId = folder.folderId;
 
-                // Share folder with speaker if speakerEmail is provided for this drive folder
-                if (pkgData.driveFolder?.speakerEmail?.trim()) {
+                const newDriveInviteEmails = pkgData.driveFolder?.speakerEmails ?? (pkgData.driveFolder?.speakerEmail?.trim() ? [pkgData.driveFolder.speakerEmail.trim()] : []);
+                for (const email of newDriveInviteEmails) {
+                  if (!email?.trim()) continue;
                   try {
                     await shareFolderWithUser({
                       userId,
                       folderId: folder.folderId,
-                      email: pkgData.driveFolder.speakerEmail.trim(),
+                      email: email.trim(),
                       role: "reader",
                     });
                   } catch (error) {
                     console.error(
-                      `Failed to share folder with speaker:`,
+                      `Failed to share folder with invitee:`,
                       error,
                     );
                   }
@@ -524,10 +555,11 @@ export const eventRouter = t.router({
 
               if (existing) {
                 try {
+                  const startISO = toMeetStartISO(meeting.startDate!, meeting.timezone || existing.timezone || "UTC");
                   await updateMeetEvent({
                     userId,
                     meetingId: existing.meetingId,
-                    startDate: meeting.startDate,
+                    startDate: startISO,
                     timezone: meeting.timezone || existing.timezone || "UTC",
                     summary: `${pkgData.name} - Session`,
                     durationMinutes: 60,
@@ -536,21 +568,22 @@ export const eventRouter = t.router({
                   updatedGoogleMeetings.push({
                     meetingId: existing.meetingId,
                     hangoutLink: existing.hangoutLink,
-                    startDateTime: meeting.startDate,
+                    startDateTime: startISO,
                     timezone: meeting.timezone || existing.timezone || "UTC",
                   });
 
-                  // Add speaker to existing meeting if speakerEmail is provided for this meeting
-                  if (meeting.speakerEmail?.trim()) {
+                  const updateMeetingInviteEmails = meeting.speakerEmails ?? (meeting.speakerEmail?.trim() ? [meeting.speakerEmail.trim()] : []);
+                  for (const email of updateMeetingInviteEmails) {
+                    if (!email?.trim()) continue;
                     try {
                       await addAttendeeToMeet({
                         userId,
                         meetingId: existing.meetingId,
-                        attendeeEmail: meeting.speakerEmail.trim(),
+                        attendeeEmail: email.trim(),
                       });
                     } catch (error) {
                       console.error(
-                        `Failed to add speaker to existing meeting ${existing.meetingId}:`,
+                        `Failed to add attendee to existing meeting ${existing.meetingId}:`,
                         error,
                       );
                     }
@@ -564,9 +597,10 @@ export const eventRouter = t.router({
                 }
               } else {
                 try {
+                  const startISO = toMeetStartISO(meeting.startDate!, meeting.timezone || "UTC");
                   const meetEvent = await createMeetEvent({
                     userId,
-                    startDate: meeting.startDate,
+                    startDate: startISO,
                     timezone: meeting.timezone || "UTC",
                     summary: `${pkgData.name} - Session`,
                     durationMinutes: 60,
@@ -579,17 +613,18 @@ export const eventRouter = t.router({
                     timezone: meeting.timezone || "UTC",
                   });
 
-                  // Add speaker to new meeting if speakerEmail is provided for this meeting
-                  if (meeting.speakerEmail?.trim()) {
+                  const newRescheduleMeetingInviteEmails = meeting.speakerEmails ?? (meeting.speakerEmail?.trim() ? [meeting.speakerEmail.trim()] : []);
+                  for (const email of newRescheduleMeetingInviteEmails) {
+                    if (!email?.trim()) continue;
                     try {
                       await addAttendeeToMeet({
                         userId,
                         meetingId: meetEvent.meetingId,
-                        attendeeEmail: meeting.speakerEmail.trim(),
+                        attendeeEmail: email.trim(),
                       });
                     } catch (error) {
                       console.error(
-                        `Failed to add speaker to new meeting ${meetEvent.meetingId}:`,
+                        `Failed to add attendee to new meeting ${meetEvent.meetingId}:`,
                         error,
                       );
                     }
@@ -638,23 +673,23 @@ export const eventRouter = t.router({
               },
             });
 
-            // Share existing drive folder with speaker if speakerEmail is provided for this drive folder
-            if (
-              pkgData.driveFolder?.speakerEmail?.trim() &&
-              pkg.googleDriveFolderId
-            ) {
-              try {
-                await shareFolderWithUser({
-                  userId,
-                  folderId: pkg.googleDriveFolderId,
-                  email: pkgData.driveFolder.speakerEmail.trim(),
-                  role: "reader",
-                });
-              } catch (error) {
-                console.error(
-                  `Failed to share existing folder with speaker:`,
-                  error,
-                );
+            const updateDriveInviteEmails = pkgData.driveFolder?.speakerEmails ?? (pkgData.driveFolder?.speakerEmail?.trim() ? [pkgData.driveFolder.speakerEmail.trim()] : []);
+            if (pkg.googleDriveFolderId && updateDriveInviteEmails.length > 0) {
+              for (const email of updateDriveInviteEmails) {
+                if (!email?.trim()) continue;
+                try {
+                  await shareFolderWithUser({
+                    userId,
+                    folderId: pkg.googleDriveFolderId,
+                    email: email.trim(),
+                    role: "reader",
+                  });
+                } catch (error) {
+                  console.error(
+                    `Failed to share existing folder with invitee:`,
+                    error,
+                  );
+                }
               }
             }
           }
