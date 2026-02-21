@@ -177,7 +177,7 @@ export function OwnerEventList() {
                                 width={16}
                                 height={16}
                               />
-                              Drive
+                              1
                             </Badge>
                           )}
                         </div>
