@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -7,7 +8,7 @@ import { authClient } from "@/lib/auth-client";
 import { buttonVariants } from "@/components/ui/button";
 import { XCircle } from "lucide-react";
 
-export default function FailedPage() {
+function FailedContent() {
   const searchParams = useSearchParams();
   const purchaseId = searchParams.get("purchase") ?? "";
   const { data: session } = authClient.useSession();
@@ -45,5 +46,13 @@ export default function FailedPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function FailedPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <FailedContent />
+    </Suspense>
   );
 }

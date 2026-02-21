@@ -25,6 +25,14 @@ import { File } from "lucide-react";
 import { OwnerHeader } from "@/components/owner-header";
 import { OwnerEventList } from "@/components/owner-event-list";
 
+type ProfileEvent = {
+  id: string;
+  title: string;
+  imageUrl?: string | null;
+  createdAt: Date | string;
+  package?: object | null;
+};
+
 export default function ProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -74,7 +82,7 @@ export default function ProfilePage() {
     );
   }
 
-  const events = profile.events ?? [];
+  const events = (profile.events ?? []) as ProfileEvent[];
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-12">

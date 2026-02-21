@@ -39,6 +39,7 @@ export const userRouter = t.router({
     }),
 
   getMe: protectedProcedure.query(async ({ ctx }) => {
+    if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Unauthorized" });
     const user = await prisma.user.findUnique({
       where: { id: ctx.user.id },
       select: { id: true, name: true, email: true, image: true, slug: true },
@@ -56,6 +57,7 @@ export const userRouter = t.router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Unauthorized" });
       if (input.slug === undefined) return { ok: true };
 
       const value = input.slug === "" ? null : input.slug;
