@@ -11,8 +11,11 @@ export async function POST(req: NextRequest) {
     const callbackToken = req.headers.get("x-callback-token");
 
     if (
-      process.env.XENDIT_WEBHOOK_TOKEN &&
-      callbackToken !== process.env.XENDIT_WEBHOOK_TOKEN
+      (process.env.NODE_ENV === "production" &&
+        callbackToken !== process.env.XENDIT_WEBHOOK_PROD_TOKEN) ||
+      (process.env.NODE_ENV !== "production" &&
+        process.env.XENDIT_WEBHOOK_TOKEN &&
+        callbackToken !== process.env.XENDIT_WEBHOOK_TOKEN)
     ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -45,7 +48,7 @@ export async function POST(req: NextRequest) {
       if (!purchase) {
         return NextResponse.json(
           { error: "Purchase not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -81,7 +84,7 @@ export async function POST(req: NextRequest) {
             } catch (error) {
               console.error(
                 `Failed to add attendee to meeting ${meeting.meetingId}:`,
-                error
+                error,
               );
             }
           }
@@ -99,7 +102,7 @@ export async function POST(req: NextRequest) {
           } catch (error) {
             console.error(
               `Failed to share Drive folder ${packageData.googleDriveFolderId}:`,
-              error
+              error,
             );
           }
         }
@@ -114,7 +117,7 @@ export async function POST(req: NextRequest) {
     console.error("Webhook error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
