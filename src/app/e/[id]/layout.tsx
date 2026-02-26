@@ -61,11 +61,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://example.com";
   const url = `${baseUrl}/e/${id}`;
-  const imageUrl = event.imageUrl
-    ? event.imageUrl.startsWith("http")
+
+  // Prefer event.imageUrl, then first image from content blocks
+  let imageUrl: string | undefined;
+  if (event.imageUrl) {
+    imageUrl = event.imageUrl.startsWith("http")
       ? event.imageUrl
-      : `${baseUrl}${event.imageUrl}`
-    : undefined;
+      : `${baseUrl}${event.imageUrl}`;
+  } else if (blocks?.length) {
+    const firstImageBlock = blocks.find(
+      (b) =>
+        b.type === "image" &&
+        (b.data as { file?: { url?: string } })?.file?.url,
+    );
+    const fileUrl = (firstImageBlock?.data as { file?: { url?: string } })
+      ?.file?.url;
+    if (fileUrl) {
+      imageUrl = fileUrl.startsWith("http") ? fileUrl : `${baseUrl}${fileUrl}`;
+    }
+  }
 
   return {
     title: `${title} | Event`,
