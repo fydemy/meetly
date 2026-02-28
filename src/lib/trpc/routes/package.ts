@@ -3,6 +3,8 @@ import { protectedProcedure, publicProcedure } from "../context";
 import { t } from "../trpc";
 import { prisma } from "@/lib/prisma";
 import { xenditClient } from "@/lib/xendit/client";
+import { addAttendeeToMeet } from "@/lib/google/calendar";
+import { shareFolderWithUser } from "@/lib/google/drive";
 
 async function runEnrollFlow(params: {
   packageId: string;
@@ -13,6 +15,13 @@ async function runEnrollFlow(params: {
 
   const pkg = await prisma.package.findUnique({
     where: { id: packageId },
+    include: {
+      event: {
+        select: {
+          userId: true,
+        },
+      },
+    },
   });
 
   if (!pkg) {
@@ -29,6 +38,72 @@ async function runEnrollFlow(params: {
 
   if (existingPurchase) {
     throw new Error("You have already purchased this package");
+  }
+
+  // Free packages: immediately mark as paid and grant access
+  if (pkg.price === 0) {
+    const purchase = await prisma.packagePurchase.create({
+      data: {
+        packageId,
+        buyerId,
+        status: "paid",
+        paidAt: new Date(),
+      },
+    });
+
+    const creatorUserId = pkg.event?.userId;
+    const buyerEmail = payerEmail;
+
+    if (creatorUserId && buyerEmail) {
+      try {
+        // Add buyer to Google Meet events
+        if (pkg.googleMeetings) {
+          const meetings = pkg.googleMeetings as Array<{
+            meetingId: string;
+            hangoutLink: string;
+          }>;
+
+          for (const meeting of meetings) {
+            try {
+              await addAttendeeToMeet({
+                userId: creatorUserId,
+                meetingId: meeting.meetingId,
+                attendeeEmail: buyerEmail,
+              });
+            } catch (error) {
+              console.error(
+                `Failed to add attendee to meeting ${meeting.meetingId}:`,
+                error,
+              );
+            }
+          }
+        }
+
+        // Share Drive folder with buyer
+        if (pkg.googleDriveFolderId) {
+          try {
+            await shareFolderWithUser({
+              userId: creatorUserId,
+              folderId: pkg.googleDriveFolderId,
+              email: buyerEmail,
+              role: "reader",
+            });
+          } catch (error) {
+            console.error(
+              `Failed to share Drive folder ${pkg.googleDriveFolderId}:`,
+              error,
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error granting access for free package:", error);
+      }
+    }
+
+    return {
+      purchaseId: purchase.id,
+      invoiceUrl: null,
+    };
   }
 
   const purchase = await prisma.packagePurchase.create({

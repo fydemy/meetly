@@ -230,8 +230,10 @@ const PackageForm: React.FC<PackageFormProps> = ({ initialData, onSave }) => {
           type="number"
           value={price}
           className="border-none focus-visible:ring-0 shadow-none p-0!"
-          onChange={(e) => setPrice(Number(e.target.value) || 0)}
-          placeholder="Price (IDR)"
+          onChange={(e) =>
+            setPrice(Math.max(0, Number(e.target.value) || 0))
+          }
+          placeholder="Price (IDR, 0 for free)"
         />
       </div>
       <div className="space-y-4">
@@ -588,7 +590,13 @@ class PackageTool {
   }
 
   validate(savedData: any) {
-    if (!savedData.name || !savedData.price) {
+    if (!savedData.name) {
+      return false;
+    }
+    if (typeof savedData.price !== "number") {
+      return false;
+    }
+    if (savedData.price < 0) {
       return false;
     }
     return true;

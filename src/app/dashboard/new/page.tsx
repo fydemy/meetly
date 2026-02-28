@@ -7,6 +7,13 @@ import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const MAX_EVENTS_PER_USER = 5;
 const Editor = dynamic(() => import("@/components/editor"), { ssr: false });
@@ -28,6 +35,7 @@ const Page = () => {
   const router = useRouter();
   const { data: events } = trpc.event.getMine.useQuery();
   const atEventLimit = (events?.length ?? 0) >= MAX_EVENTS_PER_USER;
+  const { data: orgMemberships } = trpc.organization.getMyApproved.useQuery();
 
   const [content, setContent] = useState<{
     blocks?: unknown[];
@@ -35,6 +43,9 @@ const Page = () => {
     version?: string;
   }>({ blocks: [] });
   const blobFilesRef = useRef<Map<string, File>>(new Map());
+  const [organizationId, setOrganizationId] = useState<string | "personal">(
+    "personal",
+  );
 
   const createEvent = trpc.event.create.useMutation({
     onSuccess: () => {
@@ -85,6 +96,10 @@ const Page = () => {
         version: content?.version,
       },
       files,
+      organizationId:
+        organizationId && organizationId !== "personal"
+          ? organizationId
+          : undefined,
     });
     blobFilesRef.current.clear();
   };
@@ -105,6 +120,29 @@ const Page = () => {
 
   return (
     <div className="prose">
+      {orgMemberships && orgMemberships.length > 0 && (
+        <div className="mb-4 flex flex-col gap-2 not-prose">
+          <label className="text-sm font-medium">Organizer</label>
+          <Select
+            value={organizationId}
+            onValueChange={(v) =>
+              setOrganizationId((v as string) || "personal")
+            }
+          >
+            <SelectTrigger className="w-full max-w-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="personal">Personal</SelectItem>
+              {orgMemberships.map((m) => (
+                <SelectItem key={m.organization.id} value={m.organization.id}>
+                  {m.organization.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <Editor data={content} onChange={setContent} onImageFile={onImageFile} />
       <div className="mt-4">
         <Button

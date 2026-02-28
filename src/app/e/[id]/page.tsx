@@ -38,7 +38,13 @@ export default function PublicEventPage() {
 
   const enrollMutation = trpc.package.enroll.useMutation({
     onSuccess: (data) => {
-      window.location.href = data.invoiceUrl ?? "";
+      if (pkg?.price === 0 || !data.invoiceUrl) {
+        alert(
+          "You have been enrolled to this package. Check your email and calendar for access.",
+        );
+        return;
+      }
+      window.location.href = data.invoiceUrl;
     },
     onError: (error) => {
       alert(error.message);
@@ -131,7 +137,11 @@ export default function PublicEventPage() {
       >
         <div>
           <h2 className="font-medium">{pkg.name}</h2>
-          <p className="font-bold">{formatPrice(pkg.price, pkg.currency)}</p>
+          <p className="font-bold">
+            {pkg.price === 0
+              ? "Free"
+              : formatPrice(pkg.price, pkg.currency)}
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -370,11 +380,38 @@ export default function PublicEventPage() {
   const creator = event?.user as
     | { name: string; image: string | null }
     | undefined;
+  const organization = event?.organization as
+    | { name: string; logoUrl: string | null }
+    | undefined;
 
   return (
     <>
-      <header className="mb-8">
-        {creator && (
+      <header className="mb-8 space-y-3">
+        {organization && (
+          <div className="flex items-center gap-2">
+            {organization.logoUrl && (
+              <Image
+                src={organization.logoUrl}
+                alt={organization.name}
+                width={32}
+                height={32}
+                unoptimized
+                className="size-6 rounded-full object-cover"
+              />
+            )}
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">
+                {organization.name}
+              </span>
+              {creator && (
+                <span className="text-xs text-muted-foreground">
+                  Hosted by {creator.name}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        {!organization && creator && (
           <div className="mt-3 flex items-center gap-2">
             {creator.image && (
               <Image
@@ -386,7 +423,6 @@ export default function PublicEventPage() {
                 className="size-4 rounded-full object-cover"
               />
             )}
-
             <span className="font-medium text-sm">{creator.name}</span>
           </div>
         )}

@@ -81,6 +81,13 @@ export const eventRouter = t.router({
             },
           },
           package: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              logoUrl: true,
+            },
+          },
         },
       });
 
@@ -96,10 +103,11 @@ export const eventRouter = t.router({
       z.object({
         content: editorOutputSchema,
         files: z.array(z.object({ blobUrl: z.string(), base64: z.string() })),
+        organizationId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { content, files } = input;
+      const { content, files, organizationId } = input;
       if (!ctx.user) throw new Error("Unauthorized");
       const userId = ctx.user.id;
 
@@ -158,9 +166,29 @@ export const eventRouter = t.router({
 
       if (!title) title = "Untitled";
 
+      let orgId: string | null = null;
+      if (organizationId) {
+        const membership = await prisma.organizationMembership.findFirst({
+          where: {
+            organizationId,
+            status: "approved",
+            OR: [
+              { userId },
+              { userId: null, email: ctx.user.email },
+            ],
+          },
+        });
+
+        if (!membership) {
+          throw new Error("You are not a member of this organization");
+        }
+        orgId = organizationId;
+      }
+
       const event = await prisma.event.create({
         data: {
           userId,
+          organizationId: orgId,
           title,
           imageUrl,
           content: contentWithUrls as object,
