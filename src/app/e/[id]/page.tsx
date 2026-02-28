@@ -261,6 +261,109 @@ export default function PublicEventPage() {
       );
     }
 
+    if (block.type === "code") {
+      const code = String(block.data.code ?? "");
+      return (
+        <pre
+          key={key}
+          className="my-4 overflow-x-auto rounded-lg border bg-muted/50 p-4 text-sm"
+        >
+          <code>{code}</code>
+        </pre>
+      );
+    }
+
+    if (block.type === "quote") {
+      const text = String(block.data.text ?? "");
+      const caption = String(block.data.caption ?? "");
+      const alignment = String(block.data.alignment ?? "left");
+      return (
+        <blockquote
+          key={key}
+          className={`my-4 border-l-4 border-muted-foreground/30 pl-4 italic text-muted-foreground ${
+            alignment === "center" ? "text-center" : ""
+          }`}
+        >
+          <p dangerouslySetInnerHTML={{ __html: text }} />
+          {caption && (
+            <cite className="mt-2 block not-italic text-sm">
+              — {caption}
+            </cite>
+          )}
+        </blockquote>
+      );
+    }
+
+    if (block.type === "linkTool") {
+      const link = String(block.data.link ?? "#");
+      const meta = block.data.meta as {
+        title?: string;
+        description?: string;
+        image?: { url?: string };
+      } | undefined;
+      const title = meta?.title ?? link;
+      const description = meta?.description;
+      const imageUrl = meta?.image?.url;
+      return (
+        <a
+          key={key}
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="my-4 flex overflow-hidden rounded-lg border bg-card text-card-foreground no-underline shadow-sm transition-colors hover:bg-accent/50"
+        >
+          {imageUrl && (
+            <div className="h-24 w-32 shrink-0 bg-muted">
+              <Image
+                src={imageUrl}
+                alt=""
+                width={128}
+                height={96}
+                unoptimized
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
+          <div className="flex flex-1 flex-col justify-center gap-0.5 p-3">
+            <span className="font-medium">{title}</span>
+            {description && (
+              <span className="line-clamp-2 text-sm text-muted-foreground">
+                {description}
+              </span>
+            )}
+          </div>
+        </a>
+      );
+    }
+
+    if (block.type === "embed") {
+      const embedUrl = String((block.data as { embed?: string }).embed ?? "");
+      const source = String((block.data as { source?: string }).source ?? "");
+      const width = Number((block.data as { width?: number }).width) || 580;
+      const height = Number((block.data as { height?: number }).height) || 320;
+      const caption = String((block.data as { caption?: string }).caption ?? "");
+      if (!embedUrl) return null;
+      return (
+        <figure key={key} className="my-6">
+          <div className="overflow-hidden rounded-lg border">
+            <iframe
+              src={embedUrl}
+              title={caption || source}
+              width={width}
+              height={height}
+              className="w-full"
+              allowFullScreen
+            />
+          </div>
+          {caption && (
+            <figcaption className="mt-2 text-sm text-muted-foreground">
+              {caption}
+            </figcaption>
+          )}
+        </figure>
+      );
+    }
+
     return null;
   };
 

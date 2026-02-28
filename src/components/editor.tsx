@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef } from "react";
 import EditorJS from "@editorjs/editorjs";
+import Code from "@editorjs/code";
 import Header from "@editorjs/header";
+import Image from "@editorjs/image";
+import LinkTool from "@editorjs/link";
 import List from "@editorjs/list";
 import Paragraph from "@editorjs/paragraph";
-import Image from "@editorjs/image";
+import Quote from "@editorjs/quote";
+import Embed from "@editorjs/embed";
 import PackageTool from "./editor/package-tool";
 
 interface EditorProps {
@@ -72,6 +76,18 @@ const Editor = ({ data, onChange, onImageFile }: EditorProps) => {
             package: PackageTool,
             list: List,
             paragraph: Paragraph,
+            code: Code,
+            quote: Quote,
+            linkTool: {
+              class: LinkTool,
+              config: {
+                endpoint:
+                  typeof window !== "undefined"
+                    ? `${window.location.origin}/api/fetch-url`
+                    : "/api/fetch-url",
+              },
+            },
+            embed: Embed,
           },
           async onChange(api) {
             const content = await api.saver.save();

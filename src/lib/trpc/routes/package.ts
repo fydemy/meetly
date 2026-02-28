@@ -277,6 +277,32 @@ export const packageRouter = t.router({
       };
     }),
 
+  getTotalRevenue: protectedProcedure.query(async ({ ctx }) => {
+    if (!ctx.user) throw new Error("Unauthorized");
+
+    const events = await prisma.event.findMany({
+      where: { userId: ctx.user.id },
+      include: { package: true },
+    });
+
+    let totalRevenue = 0;
+    let currency = "IDR";
+
+    for (const event of events) {
+      if (!event.package) continue;
+      const paidCount = await prisma.packagePurchase.count({
+        where: {
+          packageId: event.package.id,
+          status: "paid",
+        },
+      });
+      totalRevenue += paidCount * event.package.price;
+      if (event.package.currency) currency = event.package.currency;
+    }
+
+    return { totalRevenue, currency };
+  }),
+
   getEnrollmentsForEvent: protectedProcedure
     .input(z.object({ eventId: z.string() }))
     .query(async ({ ctx, input }) => {
